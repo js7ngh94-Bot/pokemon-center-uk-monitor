@@ -21,7 +21,7 @@ const FILTER_WORDS = [
 ];
 
 const CATEGORY_SLUGS = {
-  newArrivals: 'new-arrivals',
+  newArrivals: 'new-releases',
   outOfStock:  'out-of-stock',
 };
 
