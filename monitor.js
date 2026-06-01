@@ -11,8 +11,8 @@ const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
-const NORMAL_INTERVAL_MS = 2 * 60 * 60 * 1000;   // 2 hours
-const DROP_INTERVAL_MS   = 15 * 1000;              // 15 seconds
+const NORMAL_INTERVAL_MS = 2 * 60 * 60 * 1000;
+const DROP_INTERVAL_MS   = 15 * 1000;
 
 const FILTER_WORDS = [
   'plush', 'pin', 'badge', 'clothing', 'apparel',
@@ -20,43 +20,10 @@ const FILTER_WORDS = [
   'hat', 'bag', 'cushion', 'lamp', 'ornament'
 ];
 
-// Pokémon Center UK uses a GraphQL/API backend — we hit the API directly
-// to avoid Cloudflare protection on the HTML pages
-const API_BASE = 'https://www.pokemoncenter.com/api/2.0/page/category';
-
 const CATEGORY_SLUGS = {
   newArrivals: 'new-arrivals',
   outOfStock:  'out-of-stock',
 };
-
-const USER_AGENTS = [
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
-];
-
-function randomUA() {
-  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
-}
-
-// Shared axios instance that looks like a real browser
-const httpClient = axios.create({
-  timeout: 30000,
-  httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-  headers: {
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-GB,en;q=0.9',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Connection': 'keep-alive',
-    'Upgrade-Insecure-Requests': '1',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'none',
-    'Sec-Fetch-User': '?1',
-    'Cache-Control': 'max-age=0',
-  },
-});
 
 const STATE_FILE = path.join(__dirname, 'seen_products.json');
 
@@ -90,59 +57,17 @@ function saveState() {
 }
 
 // ─── SCRAPER ──────────────────────────────────────────────────────────────────
+const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
+
 async function scrapeProducts(slug) {
   const products = [];
+  const targetUrl = `https://www.pokemoncenter.com/en-gb/category/${slug}`;
+  const proxyUrl  = `http://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&render=true&country_code=gb`;
 
-  // Strategy 1: Try the Pokémon Center API endpoint
   try {
-    const apiUrl = `https://www.pokemoncenter.com/api/2.0/page/category/${slug}?locale=en-gb&start=0&sz=96`;
-    const res = await httpClient.get(apiUrl, {
-      headers: {
-        'User-Agent': randomUA(),
-        'Referer': `https://www.pokemoncenter.com/en-gb/category/${slug}`,
-        'x-requested-with': 'XMLHttpRequest',
-        'Accept': 'application/json, text/plain, */*',
-      }
-    });
-
-    const data = res.data;
-    const hits = data?.hits || data?.products || data?.data?.products || [];
-
-    for (const item of hits) {
-      const name  = item.name || item.productName || item.title || '';
-      const price = item.price?.sales?.formatted || item.price?.formatted || item.priceGBP || '';
-      const link  = item.url || item.productUrl || `/en-gb/product/${item.id}`;
-      const id    = item.id || item.sku || item.productId || name;
-
-      if (name) {
-        products.push({
-          name,
-          price: price || 'N/A',
-          link: link.startsWith('http') ? link : `https://www.pokemoncenter.com${link}`,
-          id: String(id),
-        });
-      }
-    }
-
-    if (products.length > 0) {
-      console.log(`  [API] Got ${products.length} products for ${slug}`);
-      return products;
-    }
-  } catch (err) {
-    console.log(`  [API] Strategy 1 failed: ${err.message}`);
-  }
-
-  // Strategy 2: Scrape HTML page with browser-like headers + delay
-  try {
-    await new Promise(r => setTimeout(r, 2000 + Math.random() * 2000));
-    const pageUrl = `https://www.pokemoncenter.com/en-gb/category/${slug}`;
-    const res = await httpClient.get(pageUrl, {
-      headers: { 'User-Agent': randomUA() }
-    });
-
+    const res = await axios.get(proxyUrl, { timeout: 60000 });
     const $ = cheerio.load(res.data);
 
-    // Try multiple selectors
     const selectors = [
       '[data-pid]',
       '.product-tile',
@@ -162,7 +87,7 @@ async function scrapeProducts(slug) {
           products.push({
             name,
             price: price || 'N/A',
-            link: link ? (link.startsWith('http') ? link : `https://www.pokemoncenter.com${link}`) : pageUrl,
+            link: link ? (link.startsWith('http') ? link : `https://www.pokemoncenter.com${link}`) : targetUrl,
             id: String(id),
           });
         }
@@ -170,7 +95,20 @@ async function scrapeProducts(slug) {
       if (products.length > 0) break;
     }
 
-    // Strategy 2b: JSON-LD within HTML
+    if (products.length === 0) {
+      const nextRaw = $('script#__NEXT_DATA__').html();
+      if (nextRaw) {
+        try {
+          const nd = JSON.parse(nextRaw);
+          const prods = nd?.props?.pageProps?.products ||
+                        nd?.props?.pageProps?.category?.products || [];
+          for (const p of prods) {
+            if (p.name) products.push({ name: p.name, price: p.price || 'N/A', link: p.url || targetUrl, id: p.id || p.name });
+          }
+        } catch (_) {}
+      }
+    }
+
     if (products.length === 0) {
       $('script[type="application/ld+json"]').each((_, el) => {
         try {
@@ -178,47 +116,16 @@ async function scrapeProducts(slug) {
           const items = Array.isArray(data) ? data : [data];
           items.forEach(item => {
             if (item['@type'] === 'Product' && item.name) {
-              products.push({
-                name: item.name,
-                price: item.offers?.price ? `£${item.offers.price}` : 'N/A',
-                link: item.url || pageUrl,
-                id: item.sku || item.name,
-              });
+              products.push({ name: item.name, price: item.offers?.price ? `£${item.offers.price}` : 'N/A', link: item.url || targetUrl, id: item.sku || item.name });
             }
           });
         } catch (_) {}
       });
     }
 
-    // Strategy 2c: window.__PRELOADED_STATE__ or next data
-    if (products.length === 0) {
-      const scriptContent = $('script#__NEXT_DATA__').html() || '';
-      if (scriptContent) {
-        try {
-          const nextData = JSON.parse(scriptContent);
-          const prods = nextData?.props?.pageProps?.products ||
-                        nextData?.props?.pageProps?.category?.products || [];
-          for (const p of prods) {
-            if (p.name) {
-              products.push({
-                name: p.name,
-                price: p.price || 'N/A',
-                link: p.url || pageUrl,
-                id: p.id || p.name,
-              });
-            }
-          }
-        } catch (_) {}
-      }
-    }
-
-    if (products.length > 0) {
-      console.log(`  [HTML] Got ${products.length} products for ${slug}`);
-    } else {
-      console.log(`  [HTML] No products found for ${slug} — site may require JS rendering`);
-    }
+    console.log(`  [${slug}] Found ${products.length} products`);
   } catch (err) {
-    console.log(`  [HTML] Strategy 2 failed: ${err.message}`);
+    console.error(`  [SCRAPE ERROR] ${slug}: ${err.message}`);
   }
 
   return products;
@@ -312,15 +219,11 @@ async function checkProducts() {
       for (const product of products) {
         if (!product.id || !product.name) continue;
 
-        // Skip filtered items
-        if (isFiltered(product.name)) {
-          continue;
-        }
+        if (isFiltered(product.name)) continue;
 
         const key = `${source}::${product.id}`;
         if (seenProducts.has(key)) continue;
 
-        // New or restocked product — analyse with Claude
         console.log(`  [NEW] ${product.name}`);
         seenProducts.add(key);
         saveState();
@@ -331,7 +234,6 @@ async function checkProducts() {
           console.log(`  [ALERTED] ${product.name} — ${analysis.priority}`);
         } catch (err) {
           console.error(`  [ANALYSIS ERROR] ${product.name}:`, err.message);
-          // Send basic alert without analysis
           await bot.sendMessage(
             TELEGRAM_CHAT_ID,
             `⚠️ *New Product (analysis failed)*\n📦 ${product.name}\n💷 ${product.price}\n🔗 ${product.link}`,
@@ -339,7 +241,6 @@ async function checkProducts() {
           );
         }
 
-        // Small delay between Claude calls
         await new Promise(r => setTimeout(r, 1000));
       }
     } catch (err) {
@@ -432,10 +333,7 @@ async function main() {
     `Send /help for commands`,
   ].join('\n'), { parse_mode: 'Markdown' });
 
-  // Run immediately on startup
   await checkProducts();
-
-  // Start normal mode scheduler
   startMonitor(NORMAL_INTERVAL_MS);
 }
 
