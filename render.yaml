@@ -1,0 +1,14 @@
+services:
+  - type: worker
+    name: pokemon-center-uk-monitor
+    runtime: node
+    buildCommand: npm install
+    startCommand: node monitor.js
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+    autoDeploy: true
