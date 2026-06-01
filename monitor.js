@@ -62,7 +62,7 @@ const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
 async function scrapeProducts(slug) {
   const products = [];
   const targetUrl = `https://www.pokemoncenter.com/en-gb/category/${slug}`;
-  const proxyUrl  = `http://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&render=true&country_code=gb`;
+  const proxyUrl  = `http://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&country_code=gb`;
 
   try {
     const res = await axios.get(proxyUrl, { timeout: 60000 });
