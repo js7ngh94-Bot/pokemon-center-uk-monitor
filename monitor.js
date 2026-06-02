@@ -11,7 +11,7 @@ const TELEGRAM_CHAT_ID  = process.env.TELEGRAM_CHAT_ID;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const SCRAPER_API_KEY   = process.env.SCRAPER_API_KEY;
 
-const NORMAL_INTERVAL_MS = 3 * 60 * 60 * 1000;
+const NORMAL_INTERVAL_MS = 2 * 60 * 60 * 1000;
 const DROP_INTERVAL_MS   = 15 * 1000;
 
 const FILTER_WORDS = [
@@ -336,12 +336,8 @@ Be specific and concise.`;
 // ─── MAIN CHECK ───────────────────────────────────────────────────────────────
 async function checkProducts() {
   const ts = new Date().toISOString();
-console.log(`[${ts}] Checking | Drop mode: ${dropMode}`);
-  const hour = new Date().getUTCHours() + 1;
-  if (hour < 7 || hour >= 24) {
-    console.log('Sleep mode — outside operating hours');
-    return;
-  }
+  console.log(`[${ts}] Checking | Drop mode: ${dropMode}`);
+
   const allProducts = [];
   for (const [key, url] of Object.entries(PAGES)) {
     try {
