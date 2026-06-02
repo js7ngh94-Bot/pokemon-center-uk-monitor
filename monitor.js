@@ -64,7 +64,7 @@ function saveState() {
 // ─── SCRAPER ──────────────────────────────────────────────────────────────────
 async function scrapeCategory(slug) {
   const targetUrl = `https://www.pokemoncenter.com/en-gb/category/${slug}`;
-  const proxyUrl  = `http://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&country_code=gb`;
+  const proxyUrl  = `http://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&render=true&country_code=gb&wait_for_selector=${encodeURIComponent('[class*="product-fe"]')}`;
 
   const res = await axios.get(proxyUrl, { timeout: 60000 });
   const $ = cheerio.load(res.data);
