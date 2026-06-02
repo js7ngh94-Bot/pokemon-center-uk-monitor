@@ -37,7 +37,7 @@ let productState = loadJSON(PRODUCTS_FILE, {});
 let ignoredProducts = new Set(loadJSON(IGNORED_FILE, []));
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: false });
 const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
 // ─── PERSISTENCE ──────────────────────────────────────────────────────────────
@@ -447,6 +447,8 @@ bot.onText(/\/help/i, (msg) => {
 async function main() {
   // Kill any other running instances
   try { await bot.deleteWebHook({ drop_pending_updates: true }); } catch(_) {}
+  await new Promise(r => setTimeout(r, 5000));
+  bot.startPolling();
   console.log('🎮 Pokémon Center UK Monitor starting...');
 
   if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID || !ANTHROPIC_API_KEY || !SCRAPER_API_KEY) {
