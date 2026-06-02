@@ -24,7 +24,7 @@ const FILTER_WORDS = [
 
 const CATEGORY_SLUGS = {
   newReleases: 'new-releases',
-  outOfStock:  'out-of-stock',
+  outOfStock:  'back-in-stock',
 };
 
 // ─── STATE FILES ──────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ async function scrapeCategory(slug) {
   const $ = cheerio.load(res.data);
   const products = [];
 
-  const selectors = ['[data-pid]', '.product-tile', '[class*="ProductCard"]', '[class*="product-card"]', 'article[class*="product"]'];
+  const selectors = ['[class*="product-fe"]', '[data-pid]', '.product-tile', '[class*="ProductCard"]', '[class*="product-card"]', 'article[class*="product"]'];
 
   for (const sel of selectors) {
     $(sel).each((_, el) => {
