@@ -424,6 +424,7 @@ async function main() {
 
   // Start HTTP server to receive webhook updates
   startWebhookServer();
+  await new Promise(r => setTimeout(r, 2000));
 
   await bot.sendMessage(TELEGRAM_CHAT_ID, [
     '🎮 *Pokémon Center UK Monitor Online*',
