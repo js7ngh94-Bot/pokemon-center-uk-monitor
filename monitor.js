@@ -419,7 +419,7 @@ async function main() {
 
   // Register webhook with Telegram
   const webhookEndpoint = `${WEBHOOK_URL}/webhook/${TELEGRAM_TOKEN}`;
-  await bot.setWebHook(webhookEndpoint, { allowed_updates: ['message', 'callback_query'] });
+  try { await bot.setWebHook(webhookEndpoint, { allowed_updates: ["message", "callback_query"], drop_pending_updates: true }); } catch(e) { console.log("Webhook already set:", e.message); }
   console.log(`Webhook set: ${webhookEndpoint}`);
 
   // Start HTTP server to receive webhook updates
