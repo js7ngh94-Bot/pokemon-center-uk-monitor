@@ -37,7 +37,7 @@ let productState = loadJSON(PRODUCTS_FILE, {});
 let ignoredProducts = new Set(loadJSON(IGNORED_FILE, []));
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: { params: { allowed_updates: ["message", "callback_query"] } } });
 const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
 // ─── PERSISTENCE ──────────────────────────────────────────────────────────────
